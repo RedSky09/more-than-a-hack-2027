@@ -35,6 +35,7 @@ data/*
 # Derived caches of the gated data (work/ is scratch space for exploration)
 work/*.npz
 work/smart_tagging.csv
+work/sens/
 
 *.mp4
 *.gzip
