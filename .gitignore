@@ -32,6 +32,10 @@ evaluation/scoreboard.csv
 data/*
 !data/README.md
 
+# Derived caches of the gated data (work/ is scratch space for exploration)
+work/*.npz
+work/smart_tagging.csv
+
 *.mp4
 *.gzip
 *.pl3container
