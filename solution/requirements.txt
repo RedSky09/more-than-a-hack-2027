@@ -1,0 +1,5 @@
+# Versions the submission was generated and checked with (Python 3.12.0, Windows).
+# solution/make_submission.py needs numpy only; pandas is used by the scorer in evaluation/ and
+# by the helper scripts in work/.
+numpy==2.5.4
+pandas==3.0.6
