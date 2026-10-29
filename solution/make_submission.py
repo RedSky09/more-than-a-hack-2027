@@ -12,7 +12,9 @@ Method
    team. A team "shows control" when its nearest player is within RADIUS metres of the ball and at
    least MARGIN metres closer than the other team's nearest player.
 2. Stoppages (D), two independent cues, either one is enough:
-     a. the ball is tracked outside the pitch (> OFFPITCH_M beyond a line);
+     a. the ball is tracked outside the pitch (> OFFPITCH_M beyond a line). A gap of fewer than
+        OFF_BRIDGE frames between such a stoppage and the next one is part of the same stoppage:
+        a ball that has just left the pitch is not back in play until someone restarts it;
      b. the 22 players are moving slowly -- the mean displacement speed of all visible players,
         averaged over ~2 s, stays under SLOW_SPEED for at least MIN_STOP frames. Slow stretches
         separated by less than BRIDGE frames are merged first.
@@ -54,6 +56,7 @@ SPEED_HALF = 12       # frames, speed is displacement over +/- this many frames
 MIN_STOP = 100        # frames (4 s), shortest stoppage
 BRIDGE = 75           # frames (3 s), slow stretches closer than this are one stoppage
 MERGE_FRAMES = 75     # frames (3 s), sandwiched spells shorter than this are absorbed
+OFF_BRIDGE = 175      # frames (7 s), gap after a ball-off-pitch stoppage closed up to the next one
 
 
 # --------------------------------------------------------------------------------------------
@@ -171,7 +174,15 @@ def stoppage_mask(players, ball):
     slow = rolling_mean(mean_player_speed(players), SPEED_WINDOW) < SLOW_SPEED
     slow = ~drop_short_runs(~slow, BRIDGE)          # merge slow stretches closer than BRIDGE
     slow = drop_short_runs(slow, MIN_STOP)
-    return off | slow
+    dead = off | slow
+
+    # Close a short gap that follows a ball-off-pitch frame and precedes the next stoppage.
+    edges = np.flatnonzero(np.diff(np.concatenate(([0], dead.astype(np.int8), [0]))))
+    runs = list(zip(edges[::2], edges[1::2]))
+    for (s0, e0), (s1, _) in zip(runs[:-1], runs[1:]):
+        if 0 < s1 - e0 <= OFF_BRIDGE and off[max(s0, e0 - 50):e0].any():
+            dead[e0:s1] = True
+    return dead
 
 
 # --------------------------------------------------------------------------------------------

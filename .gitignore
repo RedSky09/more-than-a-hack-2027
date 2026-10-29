@@ -37,6 +37,9 @@ work/*.npz
 work/smart_tagging.csv
 work/sens/
 
+# files prepared for upload (the submission CSV must not be published)
+submission/
+
 *.mp4
 *.gzip
 *.pl3container

@@ -15,7 +15,7 @@ python evaluation/validate_submission.py evaluation/results/submission.csv
 ```
 
 This writes `evaluation/results/submission.csv`. The file is deterministic; its label counts are
-`H 52419, A 36170, D 66896, X 43834`. Rename it to `<team_name>.csv` before uploading. The match
+`H 51989, A 35903, D 68068, X 43359`. Rename it to `<team_name>.csv` before uploading. The match
 data is gitignored and is not in this repository.
 
 ## Assets used, and not used
@@ -41,7 +41,10 @@ Tried and dropped:
 1. **Control evidence.** On frames where the ball is tracked, a team shows control when its nearest
    player is within 3 m of the ball and at least 1 m closer than the other team's nearest player.
 2. **Stoppages (`D`).** Either cue is enough:
-   - the ball is tracked more than 0.5 m outside the pitch;
+   - the ball is tracked more than 0.5 m outside the pitch. A gap of up to 7 s between such a
+      stoppage and the next one is closed: a ball that has just left the pitch is not back in play
+      until someone restarts it, and the tracker often finds it again a few metres inside the line
+      while it is still being retrieved;
    - the mean speed of all visible players (about 2 s window) stays below 1.3 m/s for at least 4 s.
      Slow stretches less than 3 s apart are merged. This cue does not depend on the ball, which is
      missing on about 41% of graded frames.
@@ -65,6 +68,7 @@ Tried and dropped:
 | `SLOW_SPEED` | 1.3 m/s | mean player speed is 2.1-2.5 m/s in live play and 1.4 m/s over the public dead-ball frames. **It was also the value with the best dead-ball F1 on the public window** among the values tried (1.3, 1.5, 1.7, 1.9), so the public ground truth did influence it. 1.2 gave a higher spellF1 there (0.509 vs 0.482) and was not chosen, because the difference is within noise. |
 | `SWITCH_FRAMES` | 18 | tried 12, 18, 25 (and 50 in an earlier version without stoppage detection, which produced far too few possessions). 18 also scored best of those on the public window (0.442 vs 0.419 and 0.411), a difference within noise; 12 gave many short possessions over the full match and 25 few. |
 | `MERGE_FRAMES` | 75 | same public score for 2, 3 and 4 s. |
+| `OFF_BRIDGE` | 175 frames (7 s) | added after inspecting the public window, where one stoppage was split by the ball being briefly re-tracked just inside the line. 100 frames changed nothing there; 175 and 250 gave the same result, so 175 is the smaller of the two. Effect over the full match is small: 1,182 frames (0.7% of graded) relabelled `D`. Based on essentially one public segment, so weakly supported. |
 | `MIN_STOP`, `BRIDGE` | 100, 75 | picked from a handful of public-window runs; the full-match output is insensitive to them (below). |
 
 The public window has 17 possessions and one missed possession moves spellF1 by about 0.06, so these
@@ -73,8 +77,9 @@ between our variants.
 
 ## Checks that do not need the private ground truth
 
-Over the full match the output has 265 possessions, mean 13.4 s, median 9.5 s (public window:
-14.2 s), 144 stoppages, and 42% of graded frames labelled `D`.
+Over the full match the output has 258 possessions, mean 13.6 s, median 9.7 s (public window:
+14.7 s over 16 possessions; ground truth 14.2 s over 17), 129 stoppages, and 43% of graded frames
+labelled `D`.
 
 `work/crosscheck_tags.py` compares it with the Smart Tagging, which is independent of the public
 window. 55 of 58 set pieces have a `D` run in the 4 s before or inside them. Kick-offs after a goal
@@ -104,6 +109,11 @@ weak evidence about the right value for the whole match.
 
 ## Limitations
 
+- **Late end of stoppages.** The speed cue lags when play restarts: in the public window
+  stoppages end 3-4 s late (e.g. frames 16419-16513 and 18408-18480), because player speed recovers
+  slowly after a restart. Likewise they can start late when the ball is dead but players are still
+  moving. Not fixed: ball speed alone cannot mark the restart, since the ball also moves fast
+  while dead (e.g. frames 17380-17440).
 - **Player speed is a proxy for a dead ball.** It was calibrated on the first five minutes, the
   fastest part of the match. A slow live passage can be labelled `D` and a quick restart can be
   missed. This is the largest uncertainty in the result.
