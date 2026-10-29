@@ -53,6 +53,12 @@ def run(overrides):
 
 base = run({})
 M.write_submission(os.path.join(SENS, "base.csv"), base)
+M.write_submission(os.path.join(RESULTS, "base.csv"), base)
+submitted = os.path.join(ROOT, "submission", "INVICTA.csv")
+if os.path.isfile(submitted):
+    import pandas as pd
+    same = (pd.read_csv(submitted)["label"].values == base).all()
+    print("base == submission/INVICTA.csv:", bool(same))
 runs = {}
 for param, values in GRID:
     for v in values:
@@ -87,12 +93,15 @@ print(row("base", base))
 for name, labels in runs.items():
     print(row(name, labels))
 
-print()
-out = subprocess.run(
-    [sys.executable, os.path.join(ROOT, "evaluation", "run_evaluation.py"),
-     "--gt", os.path.join(SENS, "base.csv"), "--results", RESULTS, "--out", os.path.join(SENS, "out"),
-     "--no-detail"], capture_output=True, text=True)
-lines = [l for l in out.stdout.splitlines() if l[:4].strip().isdigit() or l.startswith("rank") or l.startswith("---")]
-print("\n".join(lines))
-if out.returncode:
-    print(out.stderr[-1500:])
+for title, gt in (("consistency: scored against the base configuration", os.path.join(SENS, "base.csv")),
+                  ("public 5-minute ground truth (17 possessions -- noisy)", "public")):
+    print("\n== " + title)
+    out = subprocess.run(
+        [sys.executable, os.path.join(ROOT, "evaluation", "run_evaluation.py"),
+         "--gt", gt, "--results", RESULTS, "--out", os.path.join(SENS, "out"), "--no-detail"],
+        capture_output=True, text=True)
+    lines = [l for l in out.stdout.splitlines()
+             if l[:4].strip().isdigit() or l.startswith("rank") or l.startswith("---")]
+    print("\n".join(lines))
+    if out.returncode:
+        print(out.stderr[-1500:])

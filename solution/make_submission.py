@@ -12,7 +12,7 @@ Method
    team. A team "shows control" when its nearest player is within RADIUS metres of the ball and at
    least MARGIN metres closer than the other team's nearest player.
 2. Stoppages (D), two independent cues, either one is enough:
-     a. the ball is tracked outside the pitch (> OFFPITCH_M beyond a line). A gap of fewer than
+     a. the ball is tracked outside the pitch (> OFFPITCH_M beyond a line). A gap of at most
         OFF_BRIDGE frames between such a stoppage and the next one is part of the same stoppage:
         a ball that has just left the pitch is not back in play until someone restarts it;
      b. the 22 players are moving slowly -- the mean displacement speed of all visible players,
@@ -26,7 +26,14 @@ Method
    control evidence sets the possessor at once -- a restart always has a clear possessor.
 4. A spell of fewer than MERGE_FRAMES frames sitting directly between two spells of the other team
    is absorbed into them (a touch without control is not a change of possession).
-5. Frames outside the two graded halves are X.
+5. Kick-offs. Every frame of a half before its kick-off is D (the second half is graded from
+   110808 but kicks off at 113742, see FAQ.md). A slow-player stoppage running into a kick-off is
+   cut at the kick-off, because the ball is in play from that frame.
+6. No abstentions inside a half. A stretch with no control evidence at all between two stoppages
+   would be X; it is written as the label the scorer would substitute anyway (the previous label in
+   the half, or the next one at its head). That leaves spellF1 unchanged and avoids X counting as a
+   miss under macroF1.
+7. Frames outside the two graded halves are X.
 """
 import argparse
 import os
@@ -43,8 +50,13 @@ PITCH_L, PITCH_W = GAMES[GAME]["pitch"]
 FPS = 25
 HOME, AWAY, NOBODY = 0, 1, -1
 
-# Parameters. They come from tracking statistics and a handful of public-window checks, not from
-# a search against the public score -- see README_solution.md for how each was chosen.
+# Parameters. They come from tracking statistics and a small number of runs against the public
+# 5-minute ground truth -- see README_solution.md for how each was chosen and how much the public
+# window influenced it.
+
+# First live frame of each half, in video frames: the first half is graded from its kick-off,
+# the second kicks off at 113742 (FAQ.md, starter/load_smart_tagging.py).
+KICKOFF = {1: 11185, 2: 113742}
 RADIUS = 3.0          # m, nearest player must be this close to count as control
 MARGIN = 1.0          # m, and this much closer than the opposing team's nearest player
 SWITCH_FRAMES = 18    # frames of opposing control needed to hand over possession
@@ -243,18 +255,50 @@ def absorb_sandwiched(labels, max_len):
     return labels
 
 
+def apply_kickoffs(dead):
+    """Dead before each kick-off; a stoppage running into a kick-off ends there."""
+    dead = dead.copy()
+    for half, first, _ in half_video_blocks(GAME):
+        kick = KICKOFF[half]
+        dead[first:kick] = True
+        i = kick
+        while i < len(dead) and dead[i]:
+            dead[i] = False
+            i += 1
+    return dead
+
+
+def fill_like_scorer(labels):
+    """Replace X by the previous label, or the next one at the head -- what the scorer does to X
+    before computing spellF1 (evaluation/possession_metrics.py, fill_abstentions)."""
+    labels = labels.copy()
+    known = np.flatnonzero(labels != "X")
+    if not len(known):
+        return labels
+    idx = np.maximum.accumulate(np.where(labels != "X", np.arange(len(labels)), -1))
+    idx[idx < 0] = known[0]
+    return labels[idx]
+
+
 def predict(players, ball, team):
-    """One label per video frame: H / A / D, or X outside the graded halves."""
+    """One label per video frame: H / A / D inside the graded halves, X outside them."""
+    # Float64 arithmetic: the inputs are the float32 values read from the file, but the distance
+    # and speed sums are then far less sensitive to platform-specific rounding, so the same data
+    # gives the same file on another machine.
+    players = players.astype(np.float64)
+    ball = ball.astype(np.float64)
+
     dh, da = nearest_distance_per_team(players, ball, team)
     ev = control_evidence(dh, da)
-    dead = stoppage_mask(players, ball)
+    dead = apply_kickoffs(stoppage_mask(players, ball))
 
     labels = np.full(len(ball), "X", dtype="<U1")
     for _, first, last in half_video_blocks(GAME):
         state = possession_states(ev, dead, first, last)
         half = np.where(state == HOME, "H", np.where(state == AWAY, "A", "X"))
         half[dead[first:last + 1]] = "D"
-        labels[first:last + 1] = absorb_sandwiched(half, MERGE_FRAMES)
+        half = absorb_sandwiched(half, MERGE_FRAMES)
+        labels[first:last + 1] = fill_like_scorer(half)
     return labels
 
 
@@ -262,7 +306,7 @@ def write_submission(path, labels):
     folder = os.path.dirname(path)
     if folder and not os.path.isdir(folder):
         os.makedirs(folder)
-    with open(path, "w") as handle:
+    with open(path, "w", newline="\n") as handle:   # same bytes on every platform
         handle.write("frame,label\n")
         handle.writelines("{},{}\n".format(f, l) for f, l in enumerate(labels))
 
