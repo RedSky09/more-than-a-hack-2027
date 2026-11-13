@@ -36,6 +36,10 @@ data/*
 *.gzip
 *.pl3container
 
+# -- external datasets -------------------------------------------------------------------------
+# Not redistributed until the licence has been checked. See README for how to obtain it.
+external_data/
+
 # -- internal documents ---------------------------------------------------------------------------
 # OVERVIEW.md -- the institutional description of the competition -- IS committed. It is the only
 # place that explains why the format changed from 2026, and a document like that circulating by
