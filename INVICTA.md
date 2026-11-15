@@ -19,6 +19,7 @@ Code:
 | file | role |
 |---|---|
 | `solution/possession_rules_v5.py` | the submitted system |
+| `solution/possession_rules_v6.py` | the pass-based proxy of CHALLENGE.md, implemented and rejected (section 5) |
 | `solution/possession_rules_v4.py` | kickoff and set-piece dead ball, imported by v5 |
 | `solution/possession_rules_v3.py` | ball-out-of-play evidence and short-gap interpolation, imported by v4 and v5 |
 | `solution/possession_rules_v2.py` | control rules and held possession, imported by v3, v4 and v5 |
@@ -140,6 +141,24 @@ that the public reference does not contradict it. Its frame-level reading — ma
 alive/dead F1, both-alive team accuracy — agrees with v5; its spell-level reading is the one that
 moved the other way, and it is the noisier of the two at this sample size.
 
+v6 (not submitted) implemented the **second** proxy CHALLENGE.md offers, "a team completes more than
+two consecutive passes", as a further source of confirmed runs. Over the whole match it found 1,393
+control episodes, 401 completed passes between them and 48 pass chains, and it changed **0 frames**:
+315 dense-core runs, 48 chains, 315 runs after merging, and a submission byte-identical to v5's. The
+reason is structural, not luck. v5 already builds a run from every evidence frame linked to the next
+by a gap of up to 3 s, and accepts that run if any part of it is continuously observed; a pass chain
+links the same episodes with the same 3 s limit, so its span always falls inside a v5 run's span. A
+chain can only add a possession where v5 rejects the whole group, which requires every pass between
+two touches to take longer than 1 s — slower than a real pass. We rejected the rule rather than hunt
+for a variant that changes labels: a rule that changes nothing is only added complexity, and one
+chosen to move the public score would be tuning.
+
+The idea had looked strong on synthetic data, where a passing move crossed 1.2 s flights and v5 saw
+nothing at all. That test was a correct test of the code and a wrong model of the match: a 1.2 s
+flight is a 14 m pass at 12 m/s, slow enough to be unusual, and real passes are quick enough that
+consecutive touches fall inside v5's 1 s core gap. The place we were wrong is worth recording, because
+"why not use the passes proxy?" is the first question this system invites.
+
 ## 6. Limitations
 
 - **Possessions are merged.** On the public window v5 reports 13 possessions against 17 true ones,
@@ -162,8 +181,9 @@ moved the other way, and it is the noisier of the two at this sample size.
 - **Set-piece windows are inferred, not ground truth.** If a window starts before the ball is
   actually dead, rule 6 adds false `D`. The change is unmeasurable on the public window, so we
   accept it on the strength of the definition rather than on a score.
-- **Possession changes are detected from proximity only.** There is no pass or event recognition.
-  Aerial duels and fast counter-attacks are the likely failures.
+- **Possession changes are detected from proximity only.** There is no pass or event recognition; the
+  pass-based proxy CHALLENGE.md also offers was implemented and changed no frame (section 5), so it
+  is not in the submitted system. Aerial duels and fast counter-attacks are the likely failures.
 - **The constants are not tuned.** Tuning them needs external data with a clear licence, which we did
   not obtain in time.
 - **No full-match score is reported.** The full-match ground truth is private.
