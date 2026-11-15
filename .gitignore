@@ -26,6 +26,10 @@ evaluation/results/*.csv
 evaluation/reports/
 evaluation/scoreboard.csv
 
+# The submission copy that sits at the repository root when a run is exported for the form labels
+# the whole match, so it is exactly as sensitive as results/ above and stays out of git too.
+/INVICTA.csv
+
 # -- gated data --------------------------------------------------------------------------------
 # data/ is committed empty, with only its README, so the folder participants are told to unpack
 # into actually exists in a fresh clone. Everything they put in it stays out of git.

@@ -56,14 +56,22 @@ RESULTS_DIR = os.path.join(ROOT, "evaluation", "results")
 OUT_NAME = "possession_rules_v3.csv"
 
 
-def interpolate_short_gaps(ball, fps):
-    """Copy of `ball` with short, physically plausible gaps filled in a straight line."""
+def interpolate_short_gaps(ball, fps, blocked=None):
+    """Copy of `ball` with short, physically plausible gaps filled in a straight line.
+
+    `blocked` is an optional boolean mask of frames the fill must not cross: a gap that touches a
+    frame where the ball was out of play or a stoppage was happening is left missing, because a
+    straight line drawn across a stoppage invents possession evidence exactly where the ball is
+    dead. Callers that pass nothing get the v3 behaviour unchanged.
+    """
     out = ball.copy()
     seen = np.flatnonzero(~np.isnan(ball[:, 0]))
     max_gap = int(round(INTERP_MAX_GAP_S * fps))
     for before, after in zip(seen[:-1], seen[1:]):
         missing = after - before - 1
         if missing < 1 or missing > max_gap:
+            continue
+        if blocked is not None and blocked[before:after + 1].any():
             continue
         distance = np.hypot(*(ball[after] - ball[before]))
         if distance / ((after - before) / fps) > INTERP_MAX_SPEED:

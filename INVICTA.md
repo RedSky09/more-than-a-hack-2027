@@ -18,9 +18,10 @@ Code:
 
 | file | role |
 |---|---|
-| `solution/possession_rules_v4.py` | the submitted system |
-| `solution/possession_rules_v3.py` | ball-out-of-play evidence and short-gap interpolation, imported by v4 |
-| `solution/possession_rules_v2.py` | control rules and held possession, imported by v3 and v4 |
+| `solution/possession_rules_v5.py` | the submitted system |
+| `solution/possession_rules_v4.py` | kickoff and set-piece dead ball, imported by v5 |
+| `solution/possession_rules_v3.py` | ball-out-of-play evidence and short-gap interpolation, imported by v4 and v5 |
+| `solution/possession_rules_v2.py` | control rules and held possession, imported by v3, v4 and v5 |
 | `solution/possession_rules.py` | v1; its ATD reader and CSV writer are reused by all later versions |
 
 ## 2. Assets used
@@ -45,14 +46,29 @@ therefore available only as positions and speeds, which is what this system uses
 Per graded half (half boundaries from `games.half_video_blocks`):
 
 1. **Ball interpolation.** Gaps in the ball track of up to 1.0 s are filled in a straight line,
-   unless that would require a ball speed above 30 m/s. This only adds evidence; it never creates
-   possession on its own.
+   unless that would require a ball speed above 30 m/s. A gap is **not** filled if it touches a
+   frame where the ball is shown out of play or a tagged restart/kickoff window: a straight line
+   drawn over a stoppage is a path for a ball that was dead, and it would manufacture control
+   evidence exactly where the rules say there is none. Interpolation only ever adds evidence, so
+   this restriction can only remove false evidence.
 2. **Control evidence per frame.** The ball must be located. The nearest player of one team must be
-   within 3.0 m of it and at least 1.0 m closer than the nearest opponent. Frames where the ball moves
-   faster than 8 m/s (a pass or shot), or stays inside a 1 m box for 1 s either side of the frame (a
-   restart being set up), give no evidence.
-3. **Controlled runs.** Consecutive evidence frames of one team form a run. A run shorter than 1.5 s is
-   treated as a touch, deflection or flicker and discarded. Evidence more than 3 s apart does not join.
+   within 3.0 m of it and at least 0.5 m closer than the nearest opponent. Frames where the ball
+   moves faster than 8 m/s (a pass or shot), or stays inside a 1 m box for 1 s either side of the
+   frame (a restart being set up), give no evidence.
+
+   The 0.5 m is a **tie-break against positional noise, not a test of a duel.** CHALLENGE.md's
+   proxies for controlled possession are temporal ("a player keeps the ball for a few seconds"), and
+   the things it says do not count are touches and deflections — which rule 3 below rejects on
+   duration. Requiring the nearest opponent to be a full 1.0 m further away on *every* frame, as v4
+   did, instead refused evidence whenever a defender pressed inside that margin, so genuinely
+   carried ball became held possession or `D`.
+3. **Controlled runs.** Consecutive evidence frames of one team form a run. Evidence more than 3 s
+   apart does not join. A run is accepted only if part of it is **continuously observed**: a stretch
+   of at least 1.5 s with no internal gap longer than 1.0 s. A run that never has such a core is a
+   touch, deflection or flicker and is discarded. The run's *extent* is unchanged, so control
+   interrupted by a single occlusion is kept. Counting raw evidence frames, as v4 did, let one
+   frame of control every few seconds confirm as a run spanning minutes, and labelled the whole span
+   for that team.
 4. **Possession is held.** Between two controlled runs, the previous team keeps the ball until the
    next run starts. Dead-ball stretches split possessions, as the ground-truth definition requires
    (`H D H` is two possessions).
@@ -99,22 +115,45 @@ what we think. We describe the design history plainly rather than as if it were 
 - v4 adds the pre-kickoff dead stretch and the set-piece dead ball. These came from FAQ.md and DATA.md
   and were **verified to change nothing inside the public window**: v3 and v4 score identically on it,
   and every frame v4 changes (4063) lies outside the 5 graded public minutes.
+- v5 makes three corrections, each traced to CHALLENGE.md or to the trackers' documented behaviour
+  rather than to a score: the per-frame margin becomes a tie-break, a run needs a dense core, and
+  interpolation never crosses a stoppage. Before running it we wrote down what would falsify the
+  margin change — more than ~400 possessions over the match, or `D` below ~30% of frames. It gave 256
+  possessions and 40.6% `D`, so those checks do not reject it. We had expected `D` to fall; it rose,
+  because the tighter run rule and the interpolation block remove more evidence than the margin
+  change adds. Inside the graded window the predicted `D` share is 21.5% against a true 19.6% (v4:
+  22.5%), so the whole-match `D` share is not over-dead — it comes from the second half and the
+  pre-kickoff stretches.
+- v5 against v4 on this window: macroF1 0.714 vs 0.704, spellF1 0.440 vs 0.471. The spellF1 gap is
+  inside the ~0.04 band the scorer documents, and this window has 17 possessions, so we do not treat
+  it as evidence that one version ranks above the other. The differences we do treat as informative
+  are the structural ones, and they favour v5: 13 possessions of mean 18.1 s against 11 of 21.1 s
+  (true: 17 of 14.2 s), 6 matched transitions against 4, latency −4.2 frames against −6.5, dead-ball
+  F1 0.512 against 0.501, alive/dead F1 0.874 against 0.867. Two measures moved against v5 and we
+  record them: spell precision falls (6 spurious spells against 4) and the home-share error grows
+  (0.077 against 0.042), because when a run fails the stricter confirmation, rule 4 leaves the
+  previous team in place.
 
 No constant was re-tuned against the public window, and we do not treat its score as evidence that
-any version ranks above another; the differences are inside the noise band the scorer warns about.
-
-Public results for v4: macroF1 0.704, spellF1 0.471 (identical to v3). Shown for completeness, not as
-a claim of improvement.
+any version ranks above another; we chose v5 over v4 on the strength of the definition, and confirmed
+that the public reference does not contradict it. Its frame-level reading — macroF1, dead-ball F1,
+alive/dead F1, both-alive team accuracy — agrees with v5; its spell-level reading is the one that
+moved the other way, and it is the noisier of the two at this sample size.
 
 ## 6. Limitations
 
-- **Possessions are merged.** On the public window v4 reports 11 possessions against 17 true ones,
-  mean 21.1 s against 14.2 s. Real changes of possession are missed, most often when control is
-  brief. `spellF1` penalises this heavily, and it is the largest known weakness.
-- **Away possession is under-called.** On the public window, 700 of 2,577 true away frames are
-  labelled `D` and 71 labelled `H`.
-- **Dead ball is imperfect.** On the public window precision 0.47 and recall 0.54. Over the whole
-  match 39.5% of frames are `D`, 241 possessions of mean 13.3 s. Long stretches with no controlled
+- **Possessions are merged.** On the public window v5 reports 13 possessions against 17 true ones,
+  mean 18.1 s against 14.2 s. Real changes of possession are missed, most often when control is
+  brief; 10 of the 17 true possessions still have no predicted spell matching them at IoU 0.5.
+  `spellF1` penalises this heavily, and it is the largest known weakness.
+- **Away possession is under-called, and `D` absorbs it.** On the public window 719 of 2,577 true
+  away frames are labelled `D` and 100 labelled `H` (v4: 700 and 71). Away precision improved from
+  0.806 to 0.852 and away F1 from 0.750 to 0.758, but away recall fell from 0.701 to 0.682.
+- **Rejected runs fall back on the previous owner.** Because possession is held through contested
+  play (rule 4), a run that fails rule 3 leaves the ball with whoever had it before. On the public
+  window that pushes error toward one team: predicted home share 0.649 against a true 0.573.
+- **Dead ball is imperfect.** On the public window precision 0.489 and recall 0.538. Over the whole
+  match 40.6% of frames are `D`, 256 possessions of mean 12.2 s. Long stretches with no controlled
   run still become `D` when play may be live.
 - **The ball is missing most of the time.** DATA.md reports it visible on 56.9% of tactical frames,
   so about 43% are missing, disproportionately in crowded and aerial moments. Control evidence is
@@ -142,13 +181,13 @@ Python 3.12, `pip install -r requirements.txt` (numpy and pandas). Unpack the da
 as described in `data/README.md`, then:
 
 ```
-python solution/possession_rules_v4.py
-python evaluation/validate_submission.py evaluation/results/possession_rules_v4.csv
+python solution/possession_rules_v5.py
+python evaluation/validate_submission.py evaluation/results/possession_rules_v5.csv
 ```
 
-The output is deterministic. Copy `evaluation/results/possession_rules_v4.csv` to `INVICTA.csv` for the
+The output is deterministic. Copy `evaluation/results/possession_rules_v5.csv` to `INVICTA.csv` for the
 submission form; the CSV is not committed, the repository regenerates it.
 
-Expected whole-match label counts: H 45801, A 34226, D 78830, X 40462; 241 possessions of mean 13.3 s.
+Expected whole-match label counts: H 45728, A 32299, D 80830, X 40462; 256 possessions of mean 12.2 s.
 
-Unit tests on synthetic data (no match data): `python solution/test_possession_rules_v4.py`.
+Unit tests on synthetic data (no match data): `python solution/test_possession_rules_v5.py`.
