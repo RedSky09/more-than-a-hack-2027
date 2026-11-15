@@ -1,3 +1,8 @@
+> **Team INVICTA — Phase 1 submission.** The technical document is [INVICTA.md](INVICTA.md), the
+> system is `solution/possession_rules_v5.py`, and the submitted file is regenerated with
+> `python solution/possession_rules_v5.py` (technical document, section 8). Everything below this
+> line is the organisers' challenge documentation.
+
 # More than a Hack 2027 — Phase 1: Ball Possession
 
 **Organised by [Metrica Sports](https://metrica-sports.com), [FC Barcelona](https://www.fcbarcelona.com)

@@ -1,0 +1,9 @@
+# The exact environment the submitted file was produced in.
+#
+# requirements.txt is the organisers' minimum -- two unpinned lines, so that the scorer can run on
+# any Python they have. These are the versions INVICTA actually ran, pinned so that reproducing
+# INVICTA.csv gives the same bytes rather than a version-dependent approximation.
+#
+# Python 3.12.0
+numpy==1.26.4
+pandas==2.2.3

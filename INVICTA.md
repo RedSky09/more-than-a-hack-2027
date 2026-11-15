@@ -211,12 +211,13 @@ consecutive touches fall inside v5's 1 s core gap. The place we were wrong is wo
 The code was written with help from AI assistants. The provided match data was kept out of the working
 folder whenever an assistant had file access, and was put back only to run the pipeline locally. No
 match data, video or tracking extract was uploaded to an AI service; only code, scorer output and the
-ATD's declared channel names were shared. <team: confirm this statement is accurate before submitting>
+ATD's declared channel names were shared.
 
 ## 8. Reproduction
 
-Python 3.12, `pip install -r requirements.txt` (numpy and pandas). Unpack the data bundle into `data/`
-as described in `data/README.md`, then:
+Python 3.12.0, `pip install -r requirements.txt` (numpy and pandas). The exact versions the
+submitted file was produced with are pinned in `requirements-solution.txt` (numpy 1.26.4, pandas
+2.2.3, Python 3.12.0). Unpack the data bundle into `data/` as described in `data/README.md`, then:
 
 ```
 python solution/possession_rules_v5.py
