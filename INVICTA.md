@@ -161,10 +161,28 @@ consecutive touches fall inside v5's 1 s core gap. The place we were wrong is wo
 
 ## 6. Limitations
 
-- **Possessions are merged.** On the public window v5 reports 13 possessions against 17 true ones,
-  mean 18.1 s against 14.2 s. Real changes of possession are missed, most often when control is
-  brief; 10 of the 17 true possessions still have no predicted spell matching them at IoU 0.5.
-  `spellF1` penalises this heavily, and it is the largest known weakness.
+- **Possessions are merged, and the misses have three measured causes.** On the public window v5
+  reports 13 possessions against 17 true ones, mean 18.1 s against 14.2 s; 10 of the 17 have no
+  predicted spell matching them at IoU 0.5, and `spellF1` penalises this heavily. We traced all ten
+  with `evaluation/diagnose_misses.py`, which reads only the committed public ground truth and our
+  own output: **four** are possessions the evidence cannot confirm, including two shorter than the
+  1.5 s control threshold (0.76 s and 1.32 s) and the possession the reference splits either side of
+  one of them; **four** are real possessions that we call dead ball part-way through, because a
+  stretch with no controlled run for 6.0 s is treated as a stoppage; and **two** are possessions we
+  detect with the wrong boundary (one starts 4.8 s late, the other misses IoU 0.5 by 0.008).
+- **Half our dead ball is wrong.** 826 of the 1,616 `D` frames inside the graded public window fall
+  inside a possession the reference says was live, while the reference marks only four stoppages in
+  that window, all between 5.5 s and 20.4 s. That is the same finding as the four "called dead
+  part-way through" misses above, seen from the other side.
+- **Why the dead-ball cause was not fixed for the submission.** `D` should mean the ball is not in
+  play, and a gap in tracking evidence is not that, so the 6.0 s clause contradicts the definition
+  and is the one change we would make next. Whether it pays depends on a measurement we did not
+  take: whether those four long stoppages would still be `D` from positive evidence (the ball shown
+  out of play, or a tagged restart). If they would, dropping the clause recovers two of the ten
+  misses and costs nothing. If they would not, the away spell that ends at 15889 is held forward
+  across the next stoppage and a spell that currently matches is lost. Shipping a structural change
+  whose outcome we cannot state, two days before the deadline, was not worth a possible two
+  possessions.
 - **Away possession is under-called, and `D` absorbs it.** On the public window 719 of 2,577 true
   away frames are labelled `D` and 100 labelled `H` (v4: 700 and 71). Away precision improved from
   0.806 to 0.852 and away F1 from 0.750 to 0.758, but away recall fell from 0.701 to 0.682.
@@ -211,3 +229,6 @@ submission form; the CSV is not committed, the repository regenerates it.
 Expected whole-match label counts: H 45728, A 32299, D 80830, X 40462; 256 possessions of mean 12.2 s.
 
 Unit tests on synthetic data (no match data): `python solution/test_possession_rules_v5.py`.
+
+Miss diagnosis on the public window, reading only the committed ground truth and our own output:
+`python evaluation/diagnose_misses.py`.
