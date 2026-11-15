@@ -2,7 +2,7 @@
 
 More Than A Hack 2027, Phase 1 (possession labels for BAR-ATH).
 
-Team: INVICTA. Members: Perdi, Leonardo Nifinluri, M. Ali Assad.
+Team: INVICTA. Members: Alexander Lefta, Perdi, Leonardo Nifinluri, M. Ali Assad.
 
 ## 1. Approach
 
